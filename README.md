@@ -1,5 +1,77 @@
 # Oga
 
+> **This is the Opal-compatible fork of
+> [yorickpeterse/oga](https://github.com/yorickpeterse/oga), maintained by
+> [lutaml](https://github.com/lutaml) so that projects running under
+> [Opal](https://github.com/opal/opal) (Ruby → JavaScript compiler) can use
+> Oga without modification. The Opal compatibility work originated in
+> plurimath/oga; this fork carries it forward as a direct fork of upstream.**
+
+## Opal compatibility
+
+Upstream Oga uses the `liboga` C extension for its lexer
+(`Oga::XML::Lexer#advance_native`), which cannot be loaded under Opal.
+This fork adds a pure-Ruby implementation at
+[`ext/pureruby/oga/native/lexer.rb`](ext/pureruby/oga/native/lexer.rb) and an
+Opal-aware conditional in [`lib/oga.rb`](lib/oga.rb):
+
+```ruby
+if RUBY_PLATFORM == 'opal'
+  require 'oga/native/lexer'                            # pure-Ruby, used under Opal
+elsif ENV['OGA_PURERUBY']
+  require_relative '../ext/pureruby/oga/native/lexer'   # opt-in pure-Ruby on CRuby
+else
+  require 'liboga'                                      # C extension, upstream default
+end
+```
+
+Under CRuby/JRuby this fork behaves identically to upstream — the conditional
+falls through to `require 'liboga'`. The pure-Ruby lexer is only loaded when
+`RUBY_PLATFORM == 'opal'` or when `OGA_PURERUBY` is set.
+
+### Setup
+
+#### In a Gemfile
+
+```ruby
+gem "oga", github: "lutaml/opal-oga", branch: "main"
+```
+
+#### In an Opal build
+
+Add `ext/pureruby/` to Opal's load path so the `require 'oga/native/lexer'`
+resolves to the pure-Ruby implementation:
+
+```bash
+bundle exec opal --esm \
+  -Ivendor/oga/ext/pureruby/ \
+  -roga \
+  -e '#'
+```
+
+If the gem is installed by Bundler (not vendored as a submodule), Opal will
+find `oga/native/lexer` on the default gem load path — no extra `-I` flag
+needed. The `-Ivendor/oga/ext/pureruby/` form is for projects that vendor
+the gem as a git submodule (e.g. at `vendor/oga/`).
+
+### Used by
+
+- [moxml](https://github.com/lutaml/moxml) — unified XML API; uses this fork
+  to provide `:oga` as the default adapter under Opal.
+- [plurimath-js](https://github.com/plurimath/plurimath-js) — math notation
+  conversion; vendors this fork to provide an XML engine under Opal.
+
+### Maintenance
+
+This fork is a direct fork of `yorickpeterse/oga` and tracks `main` there.
+To pull in upstream changes, rebase onto `yorickpeterse/oga:main`.
+
+The Opal compatibility commit on top of upstream originated in
+`plurimath/oga`; it has been carried forward so this fork can be maintained
+independently of plurimath's versioning.
+
+---
+
 **NOTE:** my spare time is limited which means I am unable to dedicate a lot of
 time on Oga. If you're interested in contributing to FOSS, please take a look at
 the open issues and submit a pull request to address them where possible.
